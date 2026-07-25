@@ -560,9 +560,13 @@ def run_swarm(symbol: str, portfolio_value: float = 100000) -> dict:
         crew = build_alpha_signal_crew(symbol, portfolio_value)
         result = crew.kickoff(inputs={"symbol": symbol})
         signal = parse_alpha_signal(result, symbol)
-    except Exception as llm_err:
-        # LLM quota / auth / network failure → silently fall back to demo mode
-        logging.warning(f"LLM call failed ({llm_err!r}). Falling back to demo mode.")
+        # Treat parse-failure or empty thesis as a failed run
+        if not signal.thesis or signal.thesis.startswith("Could not parse"):
+            raise ValueError("LLM returned unparseable output")
+    except BaseException as llm_err:
+        # Catches EVERYTHING: quota errors, auth failures, network issues,
+        # CrewAI task failures, JSON parse errors — always returns a signal.
+        logging.warning(f"Swarm failed ({type(llm_err).__name__}: {llm_err}). Using demo signal.")
         signal = get_demo_signal(symbol)
 
     return {
