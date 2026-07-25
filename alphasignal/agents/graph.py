@@ -464,21 +464,36 @@ def create_synthesis_agent(llm: LLM) -> Agent:
     )
 
 
+def _resolve_llm(model: str) -> LLM:
+    """
+    Pick the best available LLM at runtime.
+
+    Priority:
+      1. Anthropic (Claude) — if ANTHROPIC_API_KEY is set
+      2. OpenAI — if OPENAI_API_KEY is set
+      3. Demo mode — neither key present
+    """
+    anthropic_key = os.getenv("ANTHROPIC_API_KEY")
+    openai_key = os.getenv("OPENAI_API_KEY")
+
+    if anthropic_key:
+        # claude-3-5-haiku is fast and inexpensive; ideal for multi-agent swarms
+        claude_model = "anthropic/claude-3-5-haiku-20241022"
+        return LLM(model=claude_model, temperature=0.1)
+
+    if openai_key:
+        return LLM(model=model, temperature=0.1)
+
+    return _create_demo_llm()
+
+
 def build_alpha_signal_crew(
     symbol: str,
     portfolio_value: float = 100000,
     current_positions: Optional[Dict[str, float]] = None,
     model: str = "gpt-4o-mini",
 ) -> Crew:
-    # Check if we have an API key for real LLM, otherwise use demo mode
-    import os
-    has_api_key = bool(os.getenv("OPENAI_API_KEY") or os.getenv("ANTHROPIC_API_KEY"))
-    
-    if has_api_key:
-        llm = LLM(model=model, temperature=0.1)
-    else:
-        # Demo mode: use a mock LLM that returns predefined responses
-        llm = _create_demo_llm()
+    llm = _resolve_llm(model)
 
     news_scanner = create_news_scanner_agent(llm)
     filings_analyst = create_filings_analyst_agent(llm)
