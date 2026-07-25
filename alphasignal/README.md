@@ -271,7 +271,8 @@ All settings are managed via environment variables (loaded from `.env`):
 
 ```env
 # ── LLM ──────────────────────────────────────────────────────────────────────
-# Anthropic is preferred; OpenAI is fallback; neither = demo mode (free)
+# Parasail is preferred; Anthropic is fallback; OpenAI is second fallback; neither = demo mode
+PARASAIL=psk-...                      # https://console.parasail.ai — fast inference, GLM-52
 ANTHROPIC_API_KEY=sk-ant-api03-...    # https://console.anthropic.com/settings/keys
 OPENAI_API_KEY=sk-proj-...            # https://platform.openai.com/api-keys
 
@@ -590,6 +591,8 @@ The swarm auto-detects and uses the best available LLM at startup — no code ch
 
 ```python
 def _resolve_llm(model: str) -> LLM:
+    if os.getenv("PARASAIL"):
+        return LLM(model="openai/parasail-glm-52", api_key=..., base_url="https://api.parasail.io/v1")
     if os.getenv("ANTHROPIC_API_KEY"):
         return LLM(model="anthropic/claude-3-5-haiku-20241022", temperature=0.1)
     if os.getenv("OPENAI_API_KEY"):
@@ -599,9 +602,10 @@ def _resolve_llm(model: str) -> LLM:
 
 | Priority | Provider | Model | When Used |
 |---|---|---|---|
-| 1st | **Anthropic** | `claude-3-5-haiku-20241022` | `ANTHROPIC_API_KEY` set |
-| 2nd | **OpenAI** | `gpt-4o-mini` | `OPENAI_API_KEY` set, no Anthropic key |
-| 3rd | **Demo Mode** | Built-in mock | Neither key present |
+| 1st | **Parasail** | `parasail-glm-52` | `PARASAIL` secret set ✅ |
+| 2nd | **Anthropic** | `claude-3-5-haiku-20241022` | `ANTHROPIC_API_KEY` set |
+| 3rd | **OpenAI** | `gpt-4o-mini` | `OPENAI_API_KEY` set |
+| 4th | **Demo Mode** | Built-in mock | No keys present |
 
 **Demo mode** supports 32 symbols with full signal data for `NVDA`, `AAPL`, `MSFT`, `TSLA`, `GOOGL`, `AMZN`. All other symbols map to NVDA data.
 
