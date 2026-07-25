@@ -1,0 +1,54 @@
+{
+  "name": "AlphaSignal",
+  "version": "1.0.0",
+  "description": "Real-Time Alpha Hunter for You.com Hackathon",
+  "author": "AlphaSignal Team",
+  "main": "main.py",
+  "scripts": {
+    "start": "python main.py",
+    "api": "python -m alphasignal.api.server",
+    "dashboard": "streamlit run dashboard/app.py --server.port 8501 --server.address 0.0.0.0",
+    "test": "pytest tests/ -v",
+    "lint": "ruff check . && black --check . && mypy alphasignal/",
+    "demo": "python scripts/demo.py"
+  },
+  "dependencies": {
+    "python": "3.11"
+  },
+  "devDependencies": {
+    "ruff": "latest",
+    "black": "latest",
+    "mypy": "latest",
+    "pytest": "latest"
+  },
+  "replit": {
+    "run": "python main.py",
+    "modules": [
+      "python-3.11",
+      "postgresql-15"
+    ],
+    "nix": {
+      "channel": "stable-23_11"
+    },
+    "hidden": [
+      ".env",
+      "__pycache__",
+      "*.pyc",
+      ".pytest_cache",
+      ".mypy_cache",
+      "output/"
+    ],
+    "editor": {
+      "fontSize": 14,
+      "tabSize": 4
+    }
+  },
+  "deployment": {
+    "build": [
+      "pip install -r requirements.txt"
+    ],
+    "run": [
+      "python -m alphasignal.api.server"
+    ]
+  }
+}

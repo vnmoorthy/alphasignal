@@ -1,0 +1,43 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+
+# Virtual envs & package libs
+.venv/
+venv/
+env/
+hackathon/
+.pythonlibs/
+
+# Replit / Nix caches
+.cache/
+.upm/
+
+# Environment
+.env
+.env.*
+
+# Output / data
+alphasignal/output/
+
+# Archives
+zipFile.zip
+*.zip
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Locks (optional to commit)
+uv.lock

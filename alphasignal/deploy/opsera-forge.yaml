@@ -1,0 +1,340 @@
+# AlphaSignal - Opsera Forge Deployment Pipeline
+# This pipeline deploys the AlphaSignal agent swarm to production
+# and provides observability for the $500 Opsera special award
+
+version: "1.0"
+
+metadata:
+  name: "alphasignal-pipeline"
+  description: "Real-time alpha hunting agent swarm with You.com Finance API, CrewAI orchestration, and Alpaca paper trading"
+  tags:
+    - "hackathon"
+    - "youcom"
+    - "crewai"
+    - "finance"
+    - "agents"
+  owner: "alphasignal-team"
+
+# Opsera Forge pipeline definition
+pipeline:
+  name: "alphasignal-deploy"
+  project: "alphasignal"
+  environment: "production"
+
+  # Source code repository
+  source:
+    type: "github"
+    repo: "your-org/alphasignal"
+    branch: "main"
+    trigger:
+      - "push"
+      - "pull_request"
+
+  # Build stage
+  stages:
+    - name: "build"
+      displayName: "Build & Test"
+      agent:
+        image: "python:3.11-slim"
+      steps:
+        - name: "checkout"
+          uses: "actions/checkout@v4"
+
+        - name: "setup-python"
+          uses: "actions/setup-python@v5"
+          with:
+            python-version: "3.11"
+
+        - name: "install-deps"
+          run: |
+            pip install --upgrade pip
+            pip install -r requirements.txt
+            pip install -e .
+
+        - name: "lint"
+          run: |
+            ruff check .
+            black --check .
+            mypy alphasignal/
+
+        - name: "test"
+          run: |
+            pytest tests/ -v --cov=alphasignal --cov-report=xml
+
+        - name: "type-check"
+          run: mypy alphasignal/
+
+    - name: "security-scan"
+      displayName: "Security Scan"
+      agent:
+        image: "aquasec/trivy:latest"
+      steps:
+        - name: "trivy-fs"
+          run: trivy fs --severity HIGH,CRITICAL .
+        - name: "trivy-deps"
+          run: trivy fs --scanners vuln,secret,config .
+
+    - name: "docker-build"
+      displayName: "Build Docker Image"
+      agent:
+        image: "docker:24-dind"
+        privileged: true
+      steps:
+        - name: "build-image"
+          run: |
+            docker build -t alphasignal:${{ github.sha }} .
+            docker tag alphasignal:${{ github.sha }} alphasignal:latest
+
+        - name: "scan-image"
+          run: |
+            trivy image --severity HIGH,CRITICAL alphasignal:${{ github.sha }}
+
+        - name: "push-registry"
+          if: github.ref == 'refs/heads/main'
+          run: |
+            echo "${{ secrets.REGISTRY_PASSWORD }}" | docker login ${{ secrets.REGISTRY_URL }} -u ${{ secrets.REGISTRY_USER }} --password-stdin
+            docker push ${{ secrets.REGISTRY_URL }}/alphasignal:${{ github.sha }}
+            docker push ${{ secrets.REGISTRY_URL }}/alphasignal:latest
+
+    - name: "deploy-staging"
+      displayName: "Deploy to Staging"
+      needs: ["build", "security-scan", "docker-build"]
+      agent:
+        image: "opsera/forge-cli:latest"
+      environment: "staging"
+      steps:
+        - name: "forge-deploy"
+          run: |
+            opsera forge deploy \
+              --pipeline alphasignal-pipeline \
+              --stage staging \
+              --image ${{ secrets.REGISTRY_URL }}/alphasignal:${{ github.sha }} \
+              --env YDC_API_KEY=${{ secrets.YDC_API_KEY }} \
+              --env PARASAIL_API_KEY=${{ secrets.PARASAIL_API_KEY }} \
+              --env ALPACA_API_KEY=${{ secrets.ALPACA_API_KEY }} \
+              --env ALPACA_SECRET_KEY=${{ secrets.ALPACA_SECRET_KEY }}
+
+        - name: "health-check"
+          run: |
+            sleep 30
+            curl -f https://staging-alphasignal.your-domain.com/health || exit 1
+
+        - name: "smoke-test"
+          run: |
+            python -m alphasignal.main test-api
+
+    - name: "deploy-production"
+      displayName: "Deploy to Production"
+      needs: ["deploy-staging"]
+      agent:
+        image: "opsera/forge-cli:latest"
+      environment: "production"
+      approval:
+        required: true
+        reviewers:
+          - "team-lead"
+      steps:
+        - name: "forge-deploy-prod"
+          run: |
+            opsera forge deploy \
+              --pipeline alphasignal-pipeline \
+              --stage production \
+              --image ${{ secrets.REGISTRY_URL }}/alphasignal:${{ github.sha }} \
+              --env YDC_API_KEY=${{ secrets.YDC_API_KEY }} \
+              --env PARASAIL_API_KEY=${{ secrets.PARASAIL_API_KEY }} \
+              --env ALPACA_API_KEY=${{ secrets.ALPACA_API_KEY }} \
+              --env ALPACA_SECRET_KEY=${{ secrets.ALPACA_SECRET_KEY }} \
+              --replicas 3 \
+              --resources "cpu=1000m,memory=2Gi"
+
+        - name: "verify-deployment"
+          run: |
+            sleep 60
+            curl -f https://alphasignal.your-domain.com/health || exit 1
+
+        - name: "notify"
+          run: |
+            curl -X POST ${{ secrets.SLACK_WEBHOOK }} \
+              -d '{"text":"🚀 AlphaSignal deployed to production! Version: ${{ github.sha }}"}'
+
+# Observability configuration
+observability:
+  metrics:
+    - name: "alphasignal_signals_generated_total"
+      type: "counter"
+      description: "Total alpha signals generated"
+      labels: ["symbol", "signal_type"]
+
+    - name: "alphasignal_confidence_score"
+      type: "histogram"
+      description: "Confidence score distribution"
+      buckets: [0.5, 0.6, 0.7, 0.72, 0.8, 0.9, 0.95, 1.0]
+
+    - name: "alphasignal_trades_executed_total"
+      type: "counter"
+      description: "Total paper trades executed"
+      labels: ["symbol", "side", "status"]
+
+    - name: "alphasignal_pnl_usd"
+      type: "gauge"
+      description: "Current unrealized P&L in USD"
+      labels: ["symbol"]
+
+    - name: "alphasignal_api_latency_seconds"
+      type: "histogram"
+      description: "You.com API latency"
+      labels: ["endpoint"]
+      buckets: [0.1, 0.5, 1.0, 2.0, 5.0, 10.0]
+
+    - name: "alphasignal_agent_duration_seconds"
+      type: "histogram"
+      description: "Agent execution duration"
+      labels: ["agent"]
+      buckets: [1, 5, 10, 30, 60, 120, 300]
+
+  logs:
+    - name: "alphasignal-audit"
+      level: "INFO"
+      format: "json"
+      fields:
+        - "timestamp"
+        - "symbol"
+        - "agent"
+        - "action"
+        - "decision"
+        - "confidence"
+        - "citations_count"
+
+  traces:
+    sampling_rate: 0.1
+    exporters:
+      - "otlp"
+      - "jaeger"
+
+  alerts:
+    - name: "high-confidence-signal"
+      condition: "alphasignal_confidence_score > 0.85"
+      severity: "info"
+      notification: "slack"
+
+    - name: "trade-execution-failed"
+      condition: "rate(alphasignal_trades_executed_total{status='failed'}[5m]) > 0"
+      severity: "critical"
+      notification: "pagerduty"
+
+    - name: "api-latency-high"
+      condition: "histogram_quantile(0.95, alphasignal_api_latency_seconds) > 5"
+      severity: "warning"
+      notification: "slack"
+
+    - name: "daily-pnl-drawdown"
+      condition: "alphasignal_pnl_usd < -1000"
+      severity: "warning"
+      notification: "slack"
+
+# Opsera Forge service definition
+service:
+  name: "alphasignal-api"
+  port: 8000
+  health_check:
+    path: "/health"
+    interval: 30s
+    timeout: 10s
+  resources:
+    requests:
+      cpu: "500m"
+      memory: "1Gi"
+    limits:
+      cpu: "2000m"
+      memory: "4Gi"
+  autoscaling:
+    min_replicas: 2
+    max_replicas: 10
+    target_cpu_utilization: 70
+  env:
+    - name: "LOG_LEVEL"
+      value: "INFO"
+    - name: "MAX_CONCURRENT_AGENTS"
+      value: "5"
+
+# Opsera dashboard configuration
+dashboards:
+  - name: "AlphaSignal Overview"
+    panels:
+      - title: "Signals Generated (24h)"
+        type: "stat"
+        metric: "sum(increase(alphasignal_signals_generated_total[24h]))"
+
+      - title: "Avg Confidence"
+        type: "gauge"
+        metric: "avg(alphasignal_confidence_score)"
+
+      - title: "Trades Executed"
+        type: "stat"
+        metric: "sum(increase(alphasignal_trades_executed_total[24h]))"
+
+      - title: "Portfolio P&L"
+        type: "timeseries"
+        metric: "alphasignal_pnl_usd"
+
+      - title: "Signal Types Distribution"
+        type: "pie"
+        metric: "sum by (signal_type) (increase(alphasignal_signals_generated_total[24h]))"
+
+      - title: "API Latency (p95)"
+        type: "timeseries"
+        metric: "histogram_quantile(0.95, alphasignal_api_latency_seconds)"
+
+      - title: "Agent Duration"
+        type: "heatmap"
+        metric: "alphasignal_agent_duration_seconds"
+
+      - title: "Recent Signals"
+        type: "table"
+        query: "topk(20, alphasignal_signals_generated_total)"
+
+  - name: "Agent Performance"
+    panels:
+      - title: "News Scanner Duration"
+        type: "timeseries"
+        metric: "alphasignal_agent_duration_seconds{agent='news_scanner'}"
+
+      - title: "Filings Analyst Duration"
+        type: "timeseries"
+        metric: "alphasignal_agent_duration_seconds{agent='filings_analyst'}"
+
+      - title: "Sentiment Agent Duration"
+        type: "timeseries"
+        metric: "alphasignal_agent_duration_seconds{agent='sentiment_agent'}"
+
+      - title: "Risk Manager Duration"
+        type: "timeseries"
+        metric: "alphasignal_agent_duration_seconds{agent='risk_manager'}"
+
+      - title: "Synthesis Duration"
+        type: "timeseries"
+        metric: "alphasignal_agent_duration_seconds{agent='synthesizer'}"
+
+# Notification channels
+notifications:
+  slack:
+    webhook_url: "${{ secrets.SLACK_WEBHOOK }}"
+    channel: "#alphasignal-alerts"
+
+  pagerduty:
+    integration_key: "${{ secrets.PAGERDUTY_KEY }}"
+    service: "alphasignal"
+
+# Secrets management (referenced, not stored)
+secrets:
+  - "YDC_API_KEY"
+  - "PARASAIL_API_KEY"
+  - "ALPACA_API_KEY"
+  - "ALPACA_SECRET_KEY"
+  - "OPENAI_API_KEY"
+  - "ANTHROPIC_API_KEY"
+  - "REGISTRY_URL"
+  - "REGISTRY_USER"
+  - "REGISTRY_PASSWORD"
+  - "SLACK_WEBHOOK"
+  - "PAGERDUTY_KEY"

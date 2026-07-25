@@ -1,0 +1,63 @@
+services:
+  # Main API Service
+  - type: web
+    name: alphasignal-api
+    env: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: python -m alphasignal.api.server
+    envVars:
+      - key: YDC_API_KEY
+        sync: false
+      - key: PARASAIL_API_KEY
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: ALPACA_API_KEY
+        sync: false
+      - key: ALPACA_SECRET_KEY
+        sync: false
+      - key: LOG_LEVEL
+        value: INFO
+    healthCheckPath: /health
+    autoDeploy: true
+
+  # Streamlit Dashboard
+  - type: web
+    name: alphasignal-dashboard
+    env: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: streamlit run dashboard/app.py --server.port=$PORT --server.address=0.0.0.0 --server.headless=true
+    envVars:
+      - key: YDC_API_KEY
+        sync: false
+      - key: PARASAIL_API_KEY
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: ALPACA_API_KEY
+        sync: false
+      - key: ALPACA_SECRET_KEY
+        sync: false
+    autoDeploy: true
+
+  # Cron Job for Watchlist
+  - type: cron
+    name: alphasignal-watchlist
+    env: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: python scripts/watchlist_runner.py NVDA AAPL MSFT TSLA GOOGL AMZN META NFLX AVGO AMD --interval 300 --auto-trade
+    schedule: "*/5 * * * *"  # Every 5 minutes
+    envVars:
+      - key: YDC_API_KEY
+        sync: false
+      - key: PARASAIL_API_KEY
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: ALPACA_API_KEY
+        sync: false
+      - key: ALPACA_SECRET_KEY
+        sync: false

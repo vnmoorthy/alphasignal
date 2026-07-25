@@ -1,0 +1,61 @@
+services:
+  - type: web
+    name: alphasignal-api
+    env: python
+    region: oregon
+    plan: starter
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "uvicorn api.server:app --host 0.0.0.0 --port $PORT"
+    envVars:
+      - key: YDC_API_KEY
+        sync: false
+      - key: PARASAIL_API_KEY
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: ALPACA_API_KEY
+        sync: false
+      - key: ALPACA_SECRET_KEY
+        sync: false
+      - key: LOG_LEVEL
+        value: INFO
+    healthCheckPath: /health
+    autoDeploy: true
+
+  - type: web
+    name: alphasignal-dashboard
+    env: python
+    region: oregon
+    plan: starter
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "streamlit run dashboard/app.py --server.port $PORT --server.address 0.0.0.0"
+    envVars:
+      - key: YDC_API_KEY
+        sync: false
+      - key: ALPACA_API_KEY
+        sync: false
+      - key: ALPACA_SECRET_KEY
+        sync: false
+    healthCheckPath: /_stcore/health
+    autoDeploy: true
+
+  - type: cron
+    name: alphasignal-watchlist
+    env: python
+    region: oregon
+    plan: starter
+    schedule: "*/15 * * * *"  # Every 15 minutes during market hours
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "python -m scripts.watchlist_runner"
+    envVars:
+      - key: YDC_API_KEY
+        sync: false
+      - key: ALPACA_API_KEY
+        sync: false
+      - key: ALPACA_SECRET_KEY
+        sync: false
+      - key: WATCHLIST_SYMBOLS
+        value: "AAPL,MSFT,GOOGL,NVDA,TSLA,AMZN,META,NFLX"
+    autoDeploy: true

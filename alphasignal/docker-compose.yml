@@ -1,0 +1,93 @@
+version: "3.8"
+
+services:
+  alphasignal-api:
+    build: .
+    container_name: alphasignal-api
+    ports:
+      - "8000:8000"
+    environment:
+      - YDC_API_KEY=${YDC_API_KEY}
+      - PARASAIL_API_KEY=${PARASAIL_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ALPACA_API_KEY=${ALPACA_API_KEY}
+      - ALPACA_SECRET_KEY=${ALPACA_SECRET_KEY}
+      - LOG_LEVEL=INFO
+    env_file:
+      - .env
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  alphasignal-dashboard:
+    build: .
+    container_name: alphasignal-dashboard
+    command: streamlit run dashboard/app.py --server.port=8501 --server.address=0.0.0.0
+    ports:
+      - "8501:8501"
+    environment:
+      - YDC_API_KEY=${YDC_API_KEY}
+      - PARASAIL_API_KEY=${PARASAIL_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ALPACA_API_KEY=${ALPACA_API_KEY}
+      - ALPACA_SECRET_KEY=${ALPACA_SECRET_KEY}
+    env_file:
+      - .env
+    depends_on:
+      - alphasignal-api
+    restart: unless-stopped
+
+  alphasignal-watchlist:
+    build: .
+    container_name: alphasignal-watchlist
+    command: python scripts/watchlist_runner.py NVDA AAPL MSFT TSLA GOOGL AMZN META NFLX AVGO AMD --interval 300 --auto-trade
+    environment:
+      - YDC_API_KEY=${YDC_API_KEY}
+      - PARASAIL_API_KEY=${PARASAIL_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ALPACA_API_KEY=${ALPACA_API_KEY}
+      - ALPACA_SECRET_KEY=${ALPACA_SECRET_KEY}
+    env_file:
+      - .env
+    depends_on:
+      - alphasignal-api
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: alphasignal-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./deploy/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus-data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: alphasignal-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=alphasignal
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - ./deploy/grafana/datasources.yml:/etc/grafana/provisioning/datasources/datasources.yml
+      - ./deploy/grafana/dashboards.yml:/etc/grafana/provisioning/dashboards/dashboards.yml
+      - ./deploy/grafana/dashboards:/var/lib/grafana/dashboards
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+
+volumes:
+  prometheus-data:
+  grafana-data:
