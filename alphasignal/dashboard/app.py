@@ -546,27 +546,36 @@ def save_signal(signal_data: dict) -> Path:
 
 
 def run_swarm(symbol: str, portfolio_value: float = 100000) -> dict:
-    """Invoke the CrewAI agent swarm synchronously and return a signal dict.
+    """Invoke the CrewAI agent swarm and return a signal dict.
 
     Fallback chain:
-      1. Configured LLM (Parasail → Anthropic → OpenAI)
+      1. Configured LLM (Parasail → Anthropic → OpenAI) via CrewAI
       2. Demo mode  — pre-canned signal, no API calls, always works
-    """
-    from agents.graph import build_alpha_signal_crew, parse_alpha_signal, get_demo_signal
-    import logging
 
-    # --- attempt 1: use whatever LLM is configured ---
-    try:
+    Uses ThreadPoolExecutor so exceptions inside CrewAI's internal threads
+    are re-raised via future.result() and reliably caught here.
+    """
+    import concurrent.futures
+    import logging
+    from agents.graph import build_alpha_signal_crew, parse_alpha_signal, get_demo_signal
+
+    def _run_crew():
         crew = build_alpha_signal_crew(symbol, portfolio_value)
         result = crew.kickoff(inputs={"symbol": symbol})
-        signal = parse_alpha_signal(result, symbol)
-        # Treat parse-failure or empty thesis as a failed run
-        if not signal.thesis or signal.thesis.startswith("Could not parse"):
-            raise ValueError("LLM returned unparseable output")
-    except BaseException as llm_err:
-        # Catches EVERYTHING: quota errors, auth failures, network issues,
-        # CrewAI task failures, JSON parse errors — always returns a signal.
-        logging.warning(f"Swarm failed ({type(llm_err).__name__}: {llm_err}). Using demo signal.")
+        sig = parse_alpha_signal(result, symbol)
+        if not sig.thesis or sig.thesis.startswith("Could not parse"):
+            raise ValueError("LLM returned empty/unparseable output")
+        return sig
+
+    try:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+            future = executor.submit(_run_crew)
+            # future.result() re-raises ANY exception from the thread
+            signal = future.result(timeout=120)
+    except BaseException as err:
+        logging.warning(
+            f"Swarm failed ({type(err).__name__}: {err}). Falling back to demo signal."
+        )
         signal = get_demo_signal(symbol)
 
     return {
@@ -791,7 +800,12 @@ def render_signal_analysis():
     col1, col2 = st.columns([1, 1], gap="large")
     with col1:
         symbol  = st.text_input("Ticker Symbol", placeholder="e.g., NVDA, AAPL, MSFT").upper().strip()
-        analyze = st.button("🚀  Run Agent Swarm", type="primary", use_container_width=True)
+        btn_col1, btn_col2 = st.columns(2)
+        with btn_col1:
+            analyze = st.button("🚀 Run Agent Swarm", type="primary", use_container_width=True)
+        with btn_col2:
+            demo_run = st.button("⚡ Instant Demo", use_container_width=True,
+                                 help="Show a pre-researched signal instantly — no API calls needed")
 
     with col2:
         st.markdown(f"""
@@ -841,8 +855,31 @@ def render_signal_analysis():
         </div>
         """, unsafe_allow_html=True)
 
-    if analyze and not symbol:
+    if (analyze or demo_run) and not symbol:
         st.warning("Please enter a ticker symbol first.")
+        return
+
+    # ── Instant demo path — always works, zero API calls ──────────────────────
+    if demo_run and symbol:
+        from agents.graph import get_demo_signal
+        signal_obj = get_demo_signal(symbol)
+        signal_data = {
+            "symbol": signal_obj.symbol,
+            "signal_type": signal_obj.signal_type.value,
+            "confidence": signal_obj.confidence,
+            "thesis": signal_obj.thesis,
+            "target_price": signal_obj.target_price,
+            "stop_loss": signal_obj.stop_loss,
+            "time_horizon": signal_obj.time_horizon,
+            "citations": [
+                {"source": c.source, "url": c.url,
+                 "title": c.title, "snippet": c.snippet}
+                for c in signal_obj.citations
+            ],
+            "timestamp": datetime.utcnow().isoformat(),
+        }
+        st.info("⚡ Showing pre-researched demo signal (no API calls)")
+        render_signal_card(signal_data)
         return
 
     if analyze and symbol:
@@ -904,12 +941,26 @@ def render_signal_analysis():
         except Exception as e:
             progress_bar.empty()
             status.empty()
-            st.error(f"❌ Unexpected error: {e}")
-            st.info(
-                "**This shouldn't happen** — the app has automatic demo-mode fallback. "
-                "Please try again. If the issue persists, check that `YDC_API_KEY` "
-                "is set in Secrets and try a symbol like `NVDA` or `AAPL`."
-            )
+            # Show demo signal so the user always gets output
+            from agents.graph import get_demo_signal
+            st.warning(f"⚠️ Live analysis unavailable ({type(e).__name__}) — showing pre-researched demo signal instead.")
+            signal_obj = get_demo_signal(symbol)
+            demo_data = {
+                "symbol": signal_obj.symbol,
+                "signal_type": signal_obj.signal_type.value,
+                "confidence": signal_obj.confidence,
+                "thesis": signal_obj.thesis,
+                "target_price": signal_obj.target_price,
+                "stop_loss": signal_obj.stop_loss,
+                "time_horizon": signal_obj.time_horizon,
+                "citations": [
+                    {"source": c.source, "url": c.url,
+                     "title": c.title, "snippet": c.snippet}
+                    for c in signal_obj.citations
+                ],
+                "timestamp": datetime.utcnow().isoformat(),
+            }
+            render_signal_card(demo_data)
 
 
 # ─── Signal Card ──────────────────────────────────────────────────────────────
