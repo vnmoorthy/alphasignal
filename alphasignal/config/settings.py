@@ -11,7 +11,7 @@ class Settings(BaseSettings):
     YDC_FINANCE_ENDPOINT: str = "https://api.you.com/finance"
 
     # Parasail
-    PARASAIL_API_KEY: str = os.getenv("PARASAIL_API_KEY", "")
+    PARASAIL_API_KEY: str = os.getenv("PARASAIL", os.getenv("PARASAIL_API_KEY", ""))
     PARASAIL_BASE_URL: str = "https://api.parasail.ai/v1"
 
     # CrewAI / LLM

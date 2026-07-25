@@ -469,17 +469,26 @@ def _resolve_llm(model: str) -> LLM:
     Pick the best available LLM at runtime.
 
     Priority:
-      1. Anthropic (Claude) — if ANTHROPIC_API_KEY is set
-      2. OpenAI — if OPENAI_API_KEY is set
-      3. Demo mode — neither key present
+      1. Parasail — if PARASAIL key is set (OpenAI-compatible, fast inference)
+      2. Anthropic (Claude) — if ANTHROPIC_API_KEY is set
+      3. OpenAI — if OPENAI_API_KEY is set
+      4. Demo mode — no key present
     """
+    parasail_key = os.getenv("PARASAIL")
     anthropic_key = os.getenv("ANTHROPIC_API_KEY")
     openai_key = os.getenv("OPENAI_API_KEY")
 
+    if parasail_key:
+        # Parasail is OpenAI-compatible; openai/ prefix tells LiteLLM to use that protocol
+        return LLM(
+            model="openai/parasail-glm-52",
+            api_key=parasail_key,
+            base_url="https://api.parasail.io/v1",
+            temperature=0.1,
+        )
+
     if anthropic_key:
-        # claude-3-5-haiku is fast and inexpensive; ideal for multi-agent swarms
-        claude_model = "anthropic/claude-3-5-haiku-20241022"
-        return LLM(model=claude_model, temperature=0.1)
+        return LLM(model="anthropic/claude-3-5-haiku-20241022", temperature=0.1)
 
     if openai_key:
         return LLM(model=model, temperature=0.1)
