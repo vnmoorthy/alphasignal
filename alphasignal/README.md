@@ -1,234 +1,317 @@
-# AlphaSignal — Real-Time Alpha Hunter
+<div align="center">
 
-> **You.com Agentic Hackathon 2024** | Track 1: Real-Time Intelligence | **Opsera Special Award Contender**
+<img src="https://img.shields.io/badge/⚡-AlphaSignal-00D4FF?style=for-the-badge&labelColor=070B14&color=00D4FF" height="40"/>
 
-AlphaSignal transforms 40 hours of equity research into a 30-second cited trade thesis, executed and monitored automatically.
+# AlphaSignal
 
-## Architecture
+### AI-powered equity research that turns 40 hours of analyst work into a 30-second cited trade thesis
 
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                        ALPHASIGNAL AGENT SWARM                                │
-├─────────────────────────────────────────────────────────────────────────────┤
-│                                                                             │
-│  ┌──────────────┐   ┌──────────────┐   ┌──────────────┐   ┌──────────────┐ │
-│  │  NEWS        │   │  FILINGS     │   │  SENTIMENT   │   │  RISK        │ │
-│  │  SCANNER     │──▶│  ANALYST     │──▶│  AGENT       │──▶│  MANAGER     │ │
-│  │  (You.com    │   │  (You.com    │   │  (Options    │   │  (Kelly      │ │
-│  │   Search)    │   │   Finance)   │   │   Flow, 13F) │   │   Sizing)    │ │
-│  └──────────────┘   └──────────────┘   └──────────────┘   └──────┬───────┘ │
-│                                                                     │       │
-│                                                                    ▼       │
-│  ┌──────────────────────────────────────────────────────────────────────┐  │
-│  │                    SYNTHESIZER (CIO)                                 │  │
-│  │  • Resolves conflicts  • Assigns confidence  • Sets target/stop     │  │
-│  │  • Full citation trail  • Outputs AlphaSignal JSON                  │  │
-│  └──────────────────────────────────────────────────────────────────────┘  │
-│                                                                    │       │
-│                                                                    ▼       │
-│  ┌──────────────────────────────────────────────────────────────────────┐  │
-│  │                    EXECUTOR (Alpaca Paper)                           │  │
-│  │  • Validates conviction > 72%  • Calculates exact shares            │  │
-│  │  • Places market order  • Records audit trail                       │  │
-│  └──────────────────────────────────────────────────────────────────────┘  │
-│                                                                             │
-└─────────────────────────────────────────────────────────────────────────────┘
-```
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-youcom--hackathonzip.replit.app-00D4FF?style=for-the-badge&logo=replit&logoColor=white)](https://youcom-hackathonzip.replit.app)
+[![Python](https://img.shields.io/badge/Python-3.11+-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
+[![CrewAI](https://img.shields.io/badge/CrewAI-Multi--Agent-7C6BFF?style=for-the-badge)](https://crewai.com)
+[![Alpaca](https://img.shields.io/badge/Alpaca-Paper%20Trading-FFB627?style=for-the-badge)](https://alpaca.markets)
+[![License: MIT](https://img.shields.io/badge/License-MIT-00E5A0?style=for-the-badge)](LICENSE)
 
-## Sponsor Stack (All Integrated)
+[![Stars](https://img.shields.io/github/stars/vnmoorthy/alphasignal?style=social)](https://github.com/vnmoorthy/alphasignal/stargazers)
+[![Forks](https://img.shields.io/github/forks/vnmoorthy/alphasignal?style=social)](https://github.com/vnmoorthy/alphasignal/network)
+[![Issues](https://img.shields.io/github/issues/vnmoorthy/alphasignal)](https://github.com/vnmoorthy/alphasignal/issues)
 
-| Sponsor | Role | Integration |
-|---------|------|-------------|
-| **You.com** | Live Data & Citations | Finance Research API + Search API |
-| **CrewAI** | Multi-Agent Orchestration | 5 specialized agents |
-| **Parasail** | Fast Inference | Sub-second LLM calls |
-| **Opsera Forge** | CI/CD + Observability | Pipeline, metrics, traces, alerts |
-| **Alpaca** | Paper Trading | Zero-commission execution |
-| **Render** | Hosting | API + Dashboard + Cron |
-| **Replit** | Dev Environment | Instant cloud IDE |
-| **LlamaIndex** | RAG Alternative | Documented as option |
+</div>
 
-## Quick Start
+---
 
-### Prerequisites
-- Python 3.11+
-- API keys for: You.com, OpenAI/Anthropic, Alpaca (paper), Parasail (optional)
+> **"The first open-source system that does what a $500K/yr buy-side analyst does — in 30 seconds, with every claim cited."**
 
-### Local Development
+AlphaSignal deploys a swarm of five specialized AI agents to scan news, read SEC filings, assess options flow, size the position with Kelly-criterion risk management, and execute a paper trade on Alpaca — all from a single ticker symbol. Every conclusion links back to its primary source.
+
+**[→ Try it live](https://youcom-hackathonzip.replit.app)**
+
+---
+
+## ✨ What Makes It Different
+
+| Feature | AlphaSignal | Traditional Tools |
+|---|---|---|
+| **Speed** | ~30 seconds end-to-end | Hours of manual research |
+| **Citations** | Every claim sourced | Opaque black-box output |
+| **Agents** | 5 specialized roles (News, Filings, Sentiment, Risk, Executor) | Single monolithic prompt |
+| **Risk Management** | Kelly-criterion position sizing + hard stops | Manual guess |
+| **Execution** | Automatic paper trade via Alpaca | Copy-paste to broker |
+| **LLM** | Claude 3.5 Haiku / GPT-4o-mini (auto-detected) | Locked to one provider |
+
+---
+
+## 🚀 Quick Start
 
 ```bash
-# Clone and setup
-git clone <repo>
-cd alphasignal
+# 1. Clone
+git clone https://github.com/vnmoorthy/alphasignal.git
+cd alphasignal/alphasignal
 
-# Install dependencies
-pip install -r requirements.txt
+# 2. Install (Python 3.11+)
+pip install uv
+uv sync
 
-# Configure environment
+# 3. Configure
 cp .env.example .env
-# Edit .env with your API keys
+# Add: ANTHROPIC_API_KEY or OPENAI_API_KEY, YDC_API_KEY, ALPACA_API_KEY, ALPACA_SECRET_KEY
 
-# Run API server
-python -m alphasignal.api.server
+# 4. Run the dashboard
+streamlit run dashboard/app.py --server.port 5000
 
-# Run dashboard (new terminal)
-streamlit run dashboard/app.py
-
-# Run analysis
-python main.py analyze NVDA
-
-# Run demo
-python scripts/demo.py
+# 5. Or run the CLI
+python main.py analyze NVDA --portfolio 100000
 ```
 
-### Docker
+> **No API key?** The app falls back to a pre-canned demo mode automatically — you can explore the full UI without any credentials.
 
-```bash
-# Start all services
-docker-compose up -d
+---
 
-# Services:
-# - API: http://localhost:8000
-# - Dashboard: http://localhost:8501
-# - Prometheus: http://localhost:9090
-# - Grafana: http://localhost:3000 (admin/alphasignal)
+## 🤖 The Agent Swarm
+
+```
+                        ┌─────────────────────────────┐
+  You type: NVDA        │     ALPHASIGNAL SWARM        │
+  ─────────────────────▶│                              │
+                        │  ① NEWS SCANNER              │
+                        │    └─ You.com Search API     │
+                        │    └─ 24h headlines, filings │
+                        │                              │
+                        │  ② FILINGS ANALYST           │
+                        │    └─ SEC 10-K/10-Q/8-K     │
+                        │    └─ Risk factor diffs      │
+                        │                              │
+                        │  ③ SENTIMENT AGENT           │
+                        │    └─ Options flow, 13F      │
+                        │    └─ Dark pool prints       │
+                        │                              │
+                        │  ④ RISK MANAGER              │
+                        │    └─ Kelly criterion        │
+                        │    └─ Stop-loss calculation  │
+                        │                              │
+                        │  ⑤ SYNTHESIZER (CIO)         │
+                        │    └─ Resolves conflicts     │
+                        │    └─ Final confidence score │
+                        └──────────────┬──────────────┘
+                                       │
+                                       ▼
+                        ┌─────────────────────────────┐
+                        │  ALPHASIGNAL OUTPUT          │
+                        │                              │
+                        │  Signal:  🟢 BULLISH         │
+                        │  Confidence: 87%             │
+                        │  Target:  $575               │
+                        │  Stop:    $490 (−5%)         │
+                        │  Horizon: 2–4 weeks          │
+                        │                              │
+                        │  Thesis: "NVDA's Data Center │
+                        │  dominance (90%+ AI training │
+                        │  share) creates sustained    │
+                        │  FCF inflection..."          │
+                        │                              │
+                        │  📎 12 citations from        │
+                        │     SEC.gov, CBOE, 13F       │
+                        └──────────────┬──────────────┘
+                                       │ confidence > 72%
+                                       ▼
+                        ┌─────────────────────────────┐
+                        │  ALPACA PAPER TRADE          │
+                        │  BUY 8 NVDA @ market         │
+                        │  Stop: $490.00               │
+                        └─────────────────────────────┘
 ```
 
-### Deploy to Render
+---
 
-1. Connect GitHub repo to Render
-2. Add environment variables in Render dashboard
-3. Services auto-deploy from `render.yaml`
+## 🏗️ Architecture
 
-## Usage
+```
+alphasignal/
+├── agents/
+│   └── graph.py          # CrewAI agent definitions, LLM routing, signal parsing
+├── api/
+│   ├── youcom.py          # You.com Finance & Search API client
+│   ├── trader.py          # Alpaca paper trading (positions, orders, P&L)
+│   └── server.py          # FastAPI REST endpoints
+├── config/
+│   └── settings.py        # Pydantic settings, env var management
+├── dashboard/
+│   └── app.py             # Streamlit dashboard — live P&L, signals, citations
+├── scripts/
+│   ├── demo.py            # Hackathon demo runner
+│   └── watchlist_runner.py# Continuous background monitoring
+├── deploy/
+│   ├── docker-compose.yml # Full stack: API + Dashboard + Prometheus + Grafana
+│   ├── opsera-forge.yaml  # CI/CD pipeline + observability
+│   └── grafana/           # Pre-built dashboards
+├── tests/                 # pytest suite
+├── main.py                # CLI entry point
+├── render.yaml            # One-click Render deployment
+└── Dockerfile
+```
 
-### CLI Commands
+---
+
+## ⚙️ Configuration
+
+Copy `.env.example` and fill in your keys:
+
+```env
+# LLM — Anthropic takes priority; OpenAI is fallback; neither = demo mode
+ANTHROPIC_API_KEY=sk-ant-...       # https://console.anthropic.com/settings/keys
+OPENAI_API_KEY=sk-...              # https://platform.openai.com/api-keys
+
+# You.com — powers all research (news, filings, sentiment)
+YDC_API_KEY=...                    # https://api.you.com
+
+# Alpaca Paper Trading — zero real money, real market prices
+ALPACA_API_KEY=...                 # https://app.alpaca.markets/paper-trading
+ALPACA_SECRET_KEY=...
+```
+
+**LLM Auto-Detection** — the agent swarm picks the best available provider at startup:
+
+```
+ANTHROPIC_API_KEY set?  →  Claude 3.5 Haiku  (fast, cheap, recommended)
+OPENAI_API_KEY set?     →  GPT-4o-mini       (fallback)
+Neither set?            →  Demo mode         (pre-canned responses, no cost)
+```
+
+---
+
+## 💻 CLI Reference
 
 ```bash
-# Analyze a symbol (runs full agent swarm)
+# Full analysis — runs all 5 agents
 python main.py analyze NVDA --portfolio 100000
 
-# Continuous watchlist monitoring
+# Continuous watchlist (re-scans every 5 min)
 python main.py watch NVDA AAPL MSFT TSLA --interval 300
 
-# Check account & positions
+# Portfolio snapshot
 python main.py account
 
 # Manual paper trade
 python main.py trade NVDA 10 buy
 
-# Test API connectivity
+# Verify all API connections
 python main.py test-api
 ```
 
-### API Endpoints
+---
+
+## 🌐 REST API
 
 ```
-GET  /health              # Health check
-GET  /account             # Portfolio status
-GET  /positions           # Current positions
-GET  /orders              # Order history
-GET  /signals             # Recent signals
-POST /analyze             # Run analysis on symbol
-POST /trade               # Execute paper trade
-GET  /metrics             # Prometheus metrics
+GET  /health              → service status
+GET  /account             → portfolio value, buying power
+GET  /positions           → open positions with unrealized P&L
+GET  /orders              → order history
+GET  /signals             → past signals with citation trails
+POST /analyze  { symbol } → trigger full agent swarm
+POST /trade    { symbol, qty, side } → manual paper trade
+GET  /metrics             → Prometheus metrics endpoint
 ```
 
-### Dashboard
+---
 
-The Streamlit dashboard (`dashboard/app.py`) provides:
-- Live P&L with position breakdown
-- Signal history with citation trails
-- Order history
-- Performance analytics (confidence distribution, signal types, P&L over time)
+## 📊 Dashboard
 
-## Project Structure
+The Streamlit dashboard at [`https://youcom-hackathonzip.replit.app`](https://youcom-hackathonzip.replit.app) gives you:
 
+- **Portfolio Overview** — live equity, cash, day P&L, unrealized gains
+- **Signal History** — every past signal with confidence score, thesis, and full citation trail
+- **Order Log** — all Alpaca orders with fill prices and status
+- **Run Analysis** — enter any ticker and watch the swarm execute in real time
+- **Watchlist** — background monitoring with auto-trade on high-confidence signals
+
+---
+
+## 🚢 Deployment
+
+### Replit (Recommended — zero setup)
+Fork this repo on Replit, add your secrets, click **Run**. Done.
+
+### Docker
+```bash
+docker-compose up -d
+# API:        http://localhost:8000
+# Dashboard:  http://localhost:8501
+# Prometheus: http://localhost:9090
+# Grafana:    http://localhost:3000  (admin / alphasignal)
 ```
-alphasignal/
-├── config/           # Settings & configuration
-├── api/              # You.com client, Alpaca trader, FastAPI server
-├── agents/           # CrewAI agent definitions & graph
-├── dashboard/        # Streamlit app
-├── scripts/          # Demo, watchlist runner
-├── deploy/           # Docker, Opsera, Prometheus, Grafana
-├── tests/            # Unit tests
-├── main.py           # CLI entry point
-├── Dockerfile
-├── docker-compose.yml
-├── render.yaml
-├── .replit
-└── requirements.txt
+
+### Render
+Connect your GitHub repo to Render — `render.yaml` configures all three services automatically.
+
+---
+
+## 🔭 Observability
+
+Pre-wired Prometheus metrics + Grafana dashboards (via Opsera Forge):
+
+| Metric | Type | Description |
+|---|---|---|
+| `alphasignal_signals_total` | Counter | Signals by symbol and direction |
+| `alphasignal_confidence` | Histogram | Confidence score distribution |
+| `alphasignal_trades_total` | Counter | Trades by symbol, side, status |
+| `alphasignal_pnl_usd` | Gauge | Unrealized P&L per position |
+| `alphasignal_agent_duration_seconds` | Histogram | Per-agent latency |
+
+Alerts fire to Slack when confidence exceeds 85%, trade execution fails, or daily drawdown crosses $1K.
+
+---
+
+## 🤝 Contributing
+
+Contributions are welcome. Please open an issue first for major changes.
+
+```bash
+# Setup dev environment
+git clone https://github.com/vnmoorthy/alphasignal.git
+cd alphasignal/alphasignal
+uv sync
+pre-commit install
+
+# Run tests
+pytest tests/ -v
+
+# Lint
+ruff check . && black --check .
 ```
 
-## Agent Details
+**Good first issues:**
+- Add more demo symbols to the `_DemoLLM` fallback
+- Implement the side-by-side symbol comparison view
+- Add live agent-by-agent progress to the dashboard
 
-### 1. News Scanner
-- **Tool:** You.com Search API
-- **Scope:** 24h news, earnings, FDA, M&A, analyst actions
-- **Output:** Material events with timestamps, sources, price impact
+---
 
-### 2. Filings Analyst
-- **Tool:** You.com Finance Research API
-- **Scope:** 10-K/Q, 8-K, 13F, Form 4, S-3, 424B
-- **Output:** Risk factor changes, MD&A tone, guidance, insider trades
+## 📚 Tech Stack
 
-### 3. Sentiment Agent
-- **Tools:** You.com Search + Finance APIs
-- **Scope:** Options flow, dark pool, short interest, 13F, analyst revisions
-- **Output:** Positioning assessment, gamma squeeze risk, crowded trade flags
+| Layer | Technology |
+|---|---|
+| **Agent Orchestration** | [CrewAI](https://crewai.com) |
+| **LLM** | Claude 3.5 Haiku (Anthropic) / GPT-4o-mini (OpenAI) |
+| **Research Data** | [You.com Finance & Search API](https://api.you.com) |
+| **Paper Trading** | [Alpaca Markets](https://alpaca.markets) |
+| **Dashboard** | [Streamlit](https://streamlit.io) |
+| **API Server** | [FastAPI](https://fastapi.tiangolo.com) |
+| **CI/CD + Observability** | [Opsera Forge](https://opsera.io) |
+| **Hosting** | [Replit](https://replit.com) / [Render](https://render.com) |
 
-### 4. Risk Manager
-- **Logic:** Kelly criterion (adjusted), max 5% position, 1% risk/trade, hard stops
-- **Output:** Exact share count, stop price, R:R ratio, portfolio heat
+---
 
-### 5. Executor
-- **Tool:** Alpaca Paper Trading API
-- **Logic:** Market orders, audit trail, position tracking
+## 📄 License
 
-## Observability (Opsera Forge)
+MIT — see [LICENSE](LICENSE).
 
-### Metrics
-- `alphasignal_signals_generated_total` - Counter by symbol, type
-- `alphasignal_confidence_score` - Histogram
-- `alphasignal_trades_executed_total` - Counter by symbol, side, status
-- `alphasignal_pnl_usd` - Gauge by symbol
-- `alphasignal_api_latency_seconds` - Histogram by endpoint
-- `alphasignal_agent_duration_seconds` - Histogram by agent
+---
 
-### Alerts
-- High-confidence signal (>85%) → Slack
-- Trade execution failure → PagerDuty
-- API latency p95 > 5s → Slack
-- Daily P&L drawdown > $1000 → Slack
+<div align="center">
 
-### Dashboards (Grafana)
-- **AlphaSignal Overview** - Portfolio P&L, signal rate, confidence, agent durations
-- **Agent Performance** - Per-agent latency, success rates
+Built with ⚡ for the **You.com Agentic Hackathon** at AWS Builder Loft, San Francisco
 
-## Hackathon Submission
+**[Live Demo](https://youcom-hackathonzip.replit.app)** · **[Report Bug](https://github.com/vnmoorthy/alphasignal/issues)** · **[Request Feature](https://github.com/vnmoorthy/alphasignal/issues)**
 
-### Track 1: Real-Time Intelligence ✓
-- Live You.com Finance API for SEC filings, earnings, options flow
-- Live You.com Search for breaking news
-- Sub-minute signal generation
-
-### Opsera Special Award ($500) ✓
-- Full Forge pipeline: build → scan → deploy → observe
-- Prometheus metrics + Grafana dashboards
-- Alert rules configured
-
-### Demo Flow (3 minutes)
-1. **Live Scan** → `python main.py analyze NVDA` (shows agent progress)
-2. **Signal Output** → Displays thesis, confidence, citations, target/stop
-3. **Paper Trade** → Confirms → Shows Alpaca fill
-4. **Dashboard** → Live P&L, citation trail, signal history
-5. **Opsera Grafana** → Production metrics
-
-## License
-
-MIT License - Built for You.com Agentic Hackathon 2024
-
-## Team
-
-Built with ❤️ for the You.com Agentic Hackathon at AWS Builder Loft, San Francisco
+</div>
