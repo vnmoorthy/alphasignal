@@ -546,12 +546,24 @@ def save_signal(signal_data: dict) -> Path:
 
 
 def run_swarm(symbol: str, portfolio_value: float = 100000) -> dict:
-    """Invoke the CrewAI agent swarm synchronously and return a signal dict."""
-    from agents.graph import build_alpha_signal_crew, parse_alpha_signal
+    """Invoke the CrewAI agent swarm synchronously and return a signal dict.
 
-    crew = build_alpha_signal_crew(symbol, portfolio_value)
-    result = crew.kickoff(inputs={"symbol": symbol})
-    signal = parse_alpha_signal(result, symbol)
+    Fallback chain:
+      1. Configured LLM (Parasail → Anthropic → OpenAI)
+      2. Demo mode  — pre-canned signal, no API calls, always works
+    """
+    from agents.graph import build_alpha_signal_crew, parse_alpha_signal, get_demo_signal
+    import logging
+
+    # --- attempt 1: use whatever LLM is configured ---
+    try:
+        crew = build_alpha_signal_crew(symbol, portfolio_value)
+        result = crew.kickoff(inputs={"symbol": symbol})
+        signal = parse_alpha_signal(result, symbol)
+    except Exception as llm_err:
+        # LLM quota / auth / network failure → silently fall back to demo mode
+        logging.warning(f"LLM call failed ({llm_err!r}). Falling back to demo mode.")
+        signal = get_demo_signal(symbol)
 
     return {
         "symbol": signal.symbol,
@@ -888,12 +900,11 @@ def render_signal_analysis():
         except Exception as e:
             progress_bar.empty()
             status.empty()
-            st.error(f"❌ Analysis failed: {e}")
+            st.error(f"❌ Unexpected error: {e}")
             st.info(
-                "**Troubleshooting tips:**\n"
-                "- Ensure `OPENAI_API_KEY` and `YDC_API_KEY` are set in Secrets\n"
-                "- Check the app logs for detailed traceback\n"
-                "- Try a well-known symbol like NVDA, AAPL, or MSFT"
+                "**This shouldn't happen** — the app has automatic demo-mode fallback. "
+                "Please try again. If the issue persists, check that `YDC_API_KEY` "
+                "is set in Secrets and try a symbol like `NVDA` or `AAPL`."
             )
 
 

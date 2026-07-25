@@ -207,6 +207,40 @@ def _create_demo_llm():
     return _DemoLLM()
 
 
+def get_demo_signal(symbol: str) -> AlphaSignal:
+    """Return a fully pre-canned AlphaSignal without calling any LLM or API.
+    Used as the guaranteed last-resort fallback when all LLM providers fail.
+    """
+    demo = _DemoLLM()
+    raw = demo._synthesizer_response(symbol)
+    try:
+        data = json.loads(raw)
+    except Exception:
+        data = {}
+
+    citations = [
+        Citation(
+            source=c.get("source", ""),
+            url=c.get("url", ""),
+            title=c.get("title", ""),
+            snippet=c.get("snippet", ""),
+        )
+        for c in data.get("citations", [])
+    ]
+
+    return AlphaSignal(
+        symbol=symbol.upper(),
+        signal_type=SignalType(data.get("signal_type", "neutral")),
+        confidence=float(data.get("confidence", 0.87)),
+        thesis=data.get("thesis", f"Demo signal for {symbol.upper()} — LLM unavailable."),
+        citations=citations,
+        target_price=data.get("target_price"),
+        stop_loss=data.get("stop_loss"),
+        time_horizon=data.get("time_horizon", "2-4 weeks"),
+        metadata={"mode": "demo"},
+    )
+
+
 class SignalType(str, Enum):
     BULLISH = "bullish"
     BEARISH = "bearish"
