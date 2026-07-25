@@ -499,13 +499,16 @@ PLOTLY_LAYOUT = dict(
 def get_account():
     return paper_trader.get_account()
 
+
 @st.cache_data(ttl=30)
 def get_positions():
     return paper_trader.get_positions()
 
+
 @st.cache_data(ttl=30)
 def get_orders():
     return paper_trader.get_order_history(limit=100)
+
 
 def load_signals():
     output_dir = Path("output")
@@ -523,11 +526,82 @@ def load_signals():
     signals.sort(key=lambda x: x.get("timestamp", ""), reverse=True)
     return signals
 
+
 def load_latest_signal(symbol):
     for s in load_signals():
         if s.get("symbol", "").upper() == symbol.upper():
             return s
     return None
+
+
+def save_signal(signal_data: dict) -> Path:
+    """Persist a signal dict to the output directory."""
+    output_dir = Path("output")
+    output_dir.mkdir(exist_ok=True)
+    ts = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+    output_file = output_dir / f"signal_{signal_data['symbol']}_{ts}.json"
+    with open(output_file, "w") as f:
+        json.dump(signal_data, f, indent=2)
+    return output_file
+
+
+def run_swarm(symbol: str, portfolio_value: float = 100000) -> dict:
+    """Invoke the CrewAI agent swarm synchronously and return a signal dict."""
+    from agents.graph import build_alpha_signal_crew, parse_alpha_signal
+
+    crew = build_alpha_signal_crew(symbol, portfolio_value)
+    result = crew.kickoff(inputs={"symbol": symbol})
+    signal = parse_alpha_signal(result, symbol)
+
+    return {
+        "symbol": signal.symbol,
+        "signal_type": signal.signal_type.value,
+        "confidence": signal.confidence,
+        "thesis": signal.thesis,
+        "target_price": signal.target_price,
+        "stop_loss": signal.stop_loss,
+        "time_horizon": signal.time_horizon,
+        "citations": [
+            {
+                "source": c.source,
+                "url": c.url,
+                "title": c.title,
+                "snippet": c.snippet,
+            }
+            for c in signal.citations
+        ],
+        "timestamp": datetime.utcnow().isoformat(),
+    }
+
+
+def execute_paper_trade(signal_data: dict):
+    """Place a paper trade based on signal data and show the result inline."""
+    symbol = signal_data["symbol"]
+    signal_type = signal_data["signal_type"]
+    confidence = signal_data["confidence"]
+
+    account = paper_trader.get_account()
+    portfolio_value = account["portfolio_value"]
+    position_size = portfolio_value * settings.MAX_POSITION_SIZE_PCT * confidence
+    price = paper_trader.get_latest_price(symbol)
+    qty = int(position_size / price) if price else 0
+
+    if qty == 0:
+        st.warning("Position size rounds to 0 shares — price may be too high or position limit too tight.")
+        return
+
+    side = "buy" if signal_type == "bullish" else "sell"
+    result = paper_trader.place_market_order(symbol, qty, side)
+
+    if result.success:
+        fill_str = f"@ ${result.filled_price:.2f}" if result.filled_price else "(pending fill)"
+        st.success(
+            f"✅ Paper trade submitted: **{qty} shares {side.upper()} {symbol}** "
+            f"{fill_str} — order {result.order_id}"
+        )
+        st.cache_data.clear()
+    else:
+        st.error(f"❌ Order failed: {result.error}")
 
 
 # ─── Sidebar ──────────────────────────────────────────────────────────────────
@@ -730,29 +804,97 @@ def render_signal_analysis():
             <div class="pipeline-step">
                 <div class="pipeline-num">04</div>
                 <div>
-                    <div class="pipeline-name">Risk Manager</div>
-                    <div class="pipeline-desc">Kelly sizing · max 5% position · hard stops</div>
+                    <div class="pipeline-name">Peer Analyst</div>
+                    <div class="pipeline-desc">Comparative valuation vs top 5 peers</div>
                 </div>
             </div>
             <div class="pipeline-step">
                 <div class="pipeline-num">05</div>
                 <div>
-                    <div class="pipeline-name">Executor</div>
-                    <div class="pipeline-desc">Alpaca paper trade · audit trail</div>
+                    <div class="pipeline-name">Risk Manager</div>
+                    <div class="pipeline-desc">Kelly sizing · max 5% position · hard stops</div>
+                </div>
+            </div>
+            <div class="pipeline-step">
+                <div class="pipeline-num">06</div>
+                <div>
+                    <div class="pipeline-name">Synthesizer (CIO)</div>
+                    <div class="pipeline-desc">Final signal · full citation trail · Alpaca paper trade</div>
                 </div>
             </div>
         </div>
         """, unsafe_allow_html=True)
 
-    if analyze and symbol:
-        with st.spinner(f"Running agent swarm on {symbol} — this takes ~45 seconds…"):
-            signal = load_latest_signal(symbol)
-            if signal:
-                render_signal_card(signal)
-            else:
-                st.info(f"No cached signal found for **{symbol}**. Run `python main.py analyze {symbol}` in the shell to generate one, then refresh.")
-    elif analyze and not symbol:
+    if analyze and not symbol:
         st.warning("Please enter a ticker symbol first.")
+        return
+
+    if analyze and symbol:
+        status = st.empty()
+        progress_bar = st.progress(0, text="Initializing agent swarm…")
+
+        try:
+            status.info(f"🤖 Spawning 6-agent swarm for **{symbol}**… this takes 45–90 seconds.")
+            progress_bar.progress(10, text="News Scanner → scanning catalysts…")
+
+            signal_data = run_swarm(symbol)
+
+            progress_bar.progress(100, text="Analysis complete!")
+            status.empty()
+
+            saved_path = save_signal(signal_data)
+            st.success(f"✅ Signal generated and saved to `{saved_path}`")
+            render_signal_card(signal_data)
+
+            # Paper trade section — only offered when confidence clears the threshold
+            confidence  = signal_data.get("confidence", 0)
+            signal_type = signal_data.get("signal_type", "neutral")
+            threshold   = settings.TRADE_CONFIDENCE_THRESHOLD
+
+            if confidence >= threshold and signal_type in ("bullish", "bearish"):
+                st.markdown("---")
+                st.markdown(
+                    f"**Confidence {confidence:.0%} ≥ {threshold:.0%} threshold** — "
+                    f"this signal qualifies for paper execution."
+                )
+                trade_col, info_col = st.columns([1, 3])
+                with trade_col:
+                    if st.button(
+                        f"🚀 Execute Paper Trade ({signal_type.upper()})",
+                        type="primary",
+                        use_container_width=True,
+                    ):
+                        execute_paper_trade(signal_data)
+                with info_col:
+                    account = get_account()
+                    pv = account.get("portfolio_value", 100000)
+                    price = paper_trader.get_latest_price(symbol)
+                    position_usd = pv * settings.MAX_POSITION_SIZE_PCT * confidence
+                    qty_est = int(position_usd / price) if price else 0
+                    st.caption(
+                        f"Estimated order: ~{qty_est} shares "
+                        f"(${position_usd:,.0f} at ${price:.2f}/share) | "
+                        f"Max position: {settings.MAX_POSITION_SIZE_PCT:.0%} of portfolio"
+                    )
+            else:
+                if signal_type == "neutral":
+                    st.info("Signal is NEUTRAL — no trade executed.")
+                else:
+                    st.info(
+                        f"Confidence {confidence:.0%} is below the {threshold:.0%} threshold "
+                        "required for paper execution."
+                    )
+
+        except Exception as e:
+            progress_bar.empty()
+            status.empty()
+            st.error(f"❌ Analysis failed: {e}")
+            st.info(
+                "**Troubleshooting tips:**\n"
+                "- Ensure `OPENAI_API_KEY` and `YDC_API_KEY` are set in Secrets\n"
+                "- Check the app logs for detailed traceback\n"
+                "- Try a well-known symbol like NVDA, AAPL, or MSFT"
+            )
 
 
 # ─── Signal Card ──────────────────────────────────────────────────────────────
@@ -774,11 +916,11 @@ def render_signal_card(signal):
         <div class="signal-meta">
             <div class="signal-meta-item">
                 <span class="signal-meta-label">🎯 Target Price</span>
-                <span class="signal-meta-value">${signal.get('target_price', 0):.2f}</span>
+                <span class="signal-meta-value">${signal.get('target_price', 0) or 0:.2f}</span>
             </div>
             <div class="signal-meta-item">
                 <span class="signal-meta-label">🛑 Stop Loss</span>
-                <span class="signal-meta-value">{signal.get('stop_loss', 0):.1%}</span>
+                <span class="signal-meta-value">{(signal.get('stop_loss', 0) or 0):.1%}</span>
             </div>
             <div class="signal-meta-item">
                 <span class="signal-meta-label">⏱ Time Horizon</span>

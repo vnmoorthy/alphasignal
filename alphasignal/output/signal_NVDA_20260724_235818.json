@@ -1,0 +1,30 @@
+{
+  "symbol": "NVDA",
+  "signal_type": "bullish",
+  "confidence": 0.87,
+  "thesis": "NVDA's Data Center dominance (90%+ AI training market share) creates sustained FCF inflection. Blackwell ramp de-risks 2025 estimates. Options flow and institutional accumulation confirm smart money conviction. Risk: China restrictions priced in.",
+  "target_price": 575.0,
+  "stop_loss": 0.05,
+  "time_horizon": "2-4 weeks",
+  "citations": [
+    {
+      "source": "sec.gov",
+      "url": "https://www.sec.gov/...",
+      "title": "NVDA 10-Q Q2 FY25",
+      "snippet": "Data Center revenue $26.3B, up 154% YoY"
+    },
+    {
+      "source": "barchart.com",
+      "url": "https://www.barchart.com/...",
+      "title": "NVDA Options Flow",
+      "snippet": "15,234 call contracts at $500/$525 strikes"
+    },
+    {
+      "source": "sec.gov",
+      "url": "https://www.sec.gov/...",
+      "title": "13F Filings",
+      "snippet": "Tiger Global: +2.3M shares, Renaissance: +1.8M shares"
+    }
+  ],
+  "timestamp": "2026-07-24T23:58:18.178593"
+}

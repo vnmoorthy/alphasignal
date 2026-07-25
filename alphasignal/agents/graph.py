@@ -237,29 +237,33 @@ class AlphaSignal:
     metadata: Dict[str, Any] = field(default_factory=dict)
 
 
+def _format_finance_result(result: FinanceResearchResult) -> str:
+    """Shared formatter for all YouCom FinanceResearchResult tool outputs."""
+    citations = [
+        {"source": c.doc_id, "url": c.url, "title": c.title, "snippet": c.snippet}
+        for c in result.citations
+    ]
+    return json.dumps({
+        "answer": result.answer,
+        "citations": citations,
+    })
+
+
 class NewsScannerTool(BaseTool):
     name: str = "news_scanner"
     description: str = "Scan real-time news, earnings, and catalyst events for a symbol"
 
     def _run(self, symbol: str, hours_back: int = 24) -> str:
-        client = YouComClient()
-        result = asyncio.run(client.finance_research(
-            f"Latest news, earnings announcements, FDA decisions, M&A rumors, "
-            f"analyst actions, and catalyst events for {symbol} in the last {hours_back} hours. "
-            f"Include source URLs and timestamps."
-        ))
-        return self._format_result(result)
-
-    def _format_result(self, result: FinanceResearchResult) -> str:
-        citations = [
-            {"source": c.source, "url": c.url, "title": c.title, "snippet": c.snippet}
-            for c in result.citations
-        ]
-        return json.dumps({
-            "answer": result.answer,
-            "citations": citations,
-            "confidence": result.confidence,
-        })
+        try:
+            client = YouComClient()
+            result = asyncio.run(client.finance_research(
+                f"Latest news, earnings announcements, FDA decisions, M&A rumors, "
+                f"analyst actions, and catalyst events for {symbol} in the last {hours_back} hours. "
+                f"Include source URLs and timestamps."
+            ))
+            return _format_finance_result(result)
+        except Exception as e:
+            return json.dumps({"error": str(e), "answer": f"News scan failed for {symbol}: {e}", "citations": []})
 
 
 class FilingsAnalyzerTool(BaseTool):
@@ -267,13 +271,16 @@ class FilingsAnalyzerTool(BaseTool):
     description: str = "Analyze SEC filings (10-K, 10-Q, 8-K) for material changes and risks"
 
     def _run(self, symbol: str) -> str:
-        client = YouComClient()
-        result = asyncio.run(client.finance_research(
-            f"Latest SEC filings analysis for {symbol}: 10-K risk factors, 10-Q MD&A highlights, "
-            f"8-K material events, insider transactions, share buybacks, guidance changes. "
-            f"Focus on changes vs prior period."
-        ))
-        return self._format_result(result)
+        try:
+            client = YouComClient()
+            result = asyncio.run(client.finance_research(
+                f"Latest SEC filings analysis for {symbol}: 10-K risk factors, 10-Q MD&A highlights, "
+                f"8-K material events, insider transactions, share buybacks, guidance changes. "
+                f"Focus on changes vs prior period."
+            ))
+            return _format_finance_result(result)
+        except Exception as e:
+            return json.dumps({"error": str(e), "answer": f"Filings analysis failed for {symbol}: {e}", "citations": []})
 
 
 class SentimentAnalyzerTool(BaseTool):
@@ -281,13 +288,16 @@ class SentimentAnalyzerTool(BaseTool):
     description: str = "Analyze options flow, social sentiment, and institutional positioning"
 
     def _run(self, symbol: str) -> str:
-        client = YouComClient()
-        result = asyncio.run(client.finance_research(
-            f"Options flow analysis for {symbol}: unusual volume, put/call ratio, gamma exposure, "
-            f"dealer positioning, dark pool prints. Social sentiment from Twitter/Reddit/StockTwits. "
-            f"Institutional ownership changes, 13F filings, short interest."
-        ))
-        return self._format_result(result)
+        try:
+            client = YouComClient()
+            result = asyncio.run(client.finance_research(
+                f"Options flow analysis for {symbol}: unusual volume, put/call ratio, gamma exposure, "
+                f"dealer positioning, dark pool prints. Social sentiment from Twitter/Reddit/StockTwits. "
+                f"Institutional ownership changes, 13F filings, short interest."
+            ))
+            return _format_finance_result(result)
+        except Exception as e:
+            return json.dumps({"error": str(e), "answer": f"Sentiment analysis failed for {symbol}: {e}", "citations": []})
 
 
 class PeerComparisonTool(BaseTool):
@@ -295,12 +305,15 @@ class PeerComparisonTool(BaseTool):
     description: str = "Compare valuation, growth, and quality metrics vs peers"
 
     def _run(self, symbol: str) -> str:
-        client = YouComClient()
-        result = asyncio.run(client.finance_research(
-            f"Peer comparison for {symbol}: EV/EBITDA, P/E, PEG, revenue growth, EBITDA margins, "
-            f"FCF yield, ROIC, debt/EBITDA vs top 5 competitors. Relative performance YTD, 1Y, 3Y."
-        ))
-        return self._format_result(result)
+        try:
+            client = YouComClient()
+            result = asyncio.run(client.finance_research(
+                f"Peer comparison for {symbol}: EV/EBITDA, P/E, PEG, revenue growth, EBITDA margins, "
+                f"FCF yield, ROIC, debt/EBITDA vs top 5 competitors. Relative performance YTD, 1Y, 3Y."
+            ))
+            return _format_finance_result(result)
+        except Exception as e:
+            return json.dumps({"error": str(e), "answer": f"Peer comparison failed for {symbol}: {e}", "citations": []})
 
 
 class RiskManagerTool(BaseTool):
